@@ -1,65 +1,57 @@
-![GitHub](https://img.shields.io/github/license/GuoXiCheng/SKIP) ![GitHub all releases](https://img.shields.io/github/downloads/GuoXiCheng/SKIP/total) ![GitHub Repo stars](https://img.shields.io/github/stars/GuoXiCheng/SKIP)
+# SKIP · 易用修改版
 
-## SKIP 介绍
+基于 [GuoXiCheng/SKIP](https://github.com/GuoXiCheng/SKIP) 开发的个人修改版，保留原项目通过 Android 无障碍服务尝试跳过开屏广告的功能，修复了一些使用问题，并精简界面，让初次使用更容易上手。
 
-SKIP 是一款免费开源的安卓应用，旨在利用安卓无障碍服务帮助用户快速点击 APP 开屏广告的跳过按钮，让你的使用体验更加流畅。
+**本项目是第三方修改版，与原作者的官方发行版本不同。感谢 GuoXiCheng 及原项目贡献者的工作。**
 
-## 主界面预览
+## 主要修改
 
-<img src="https://skip.guoxicheng.top//images/main-interface-light.png" alt="https://skip.guoxicheng.top//images/main-interface-light.png" style="width: 30%;" />
+- 每次应用启动或从后台回到前台，只在前 **6 秒**尝试跳广告，减少对应用内其他“跳过”文字的误触。
+- 先尝试点击，再检查原位置是否仍为同一跳过按钮；满足间隔后再试，按钮消失、移动或页面变化时停止本轮重试。
+- 修复隐藏最近任务卡片设置的同步问题，以及白名单搜索时光标回跳的问题。
+- 调整提示文案，点击尝试不再被表述为已经成功跳过。
+- 精简设置，移除严格模式、布局检查、自定义配置编辑入口及原版 APK 更新入口。
+- 各功能页右上角提供问号按钮，直接打开内置离线说明。
+- 应用保活提供手机系统选择和对应操作指引，操作步骤按卡片展示。
+- 白名单提供“显示系统应用”开关和一次性自动识别按钮，解释可通过旁边的 ⓘ 查看。
+- 自动白名单支持 `com.android.` 前缀、19 个厂商包名前缀和 97 个具体应用包名，包括谷歌、微软、苹果等常见产品。
+- 调整排版，并让底部导航栏随浅色 / 深色主题匹配背景与图标颜色。
 
-## 文档
+## 安装与使用
 
-[SKIP 文档](https://skip.guoxicheng.top/)
+1. 从 [Releases 发布页](https://github.com/laosun124/SKIP-Easy/releases/latest) 下载修改版 APK 并安装。
+2. 打开 SKIP，按提示开启无障碍服务。
+3. 进入“应用保活”，选择自己的手机系统，按步骤设置后台运行权限。
+4. 按需调整“应用白名单”。打开白名单的应用不会被自动点击。
+5. 打开其他应用，SKIP 会在其进入前台后的前 6 秒尝试识别并点击跳过按钮。
 
-## 许可证
+自动白名单是一次性操作，会重新设置当前已安装应用的白名单，覆盖现有手动选择；完成后仍可逐项调整。厂商前缀和内置名单属于便捷分类，不能验证应用开发者身份，也无法保证覆盖所有国外应用。
 
-[GPL-3.0 license](https://github.com/GuoXiCheng/SKIP/blob/main/LICENSE)
+## 适用范围
 
-## 补充说明
+- Android 8.0（API 26）及以上。
+- 当前版本：`3.1.0-6s-fix7`，版本代码 `9`。
+- 跳过效果取决于广告页面是否暴露可识别、可点击的控件，不保证所有广告都能跳过。
+- 各系统的后台设置路径可能因版本和机型变化，保活不能保证系统永远不关闭服务。
+- 当前提供的 APK 使用本地调试证书签名，便于覆盖安装此前同签名的修改版；与其他签名的原版可能无法直接互相覆盖。
 
-[免责声明](https://github.com/GuoXiCheng/SKIP/blob/main/DISCLAIMER.md)
+## 从源码构建
 
-## Star History
+使用 Android Studio 打开本目录，配置 JDK 17 和 Android SDK 34，然后运行：
 
-<a href="https://www.star-history.com/?repos=GuoXiCheng%2FSKIP&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=GuoXiCheng/SKIP&type=date&theme=dark&legend=top-left&sealed_token=A2-bonTSUbt1ikMAft77ZB2wFf5oAbd_v8rSpnTATyoZZu3dSXnBgYJvA4ryBg3m5I38hpeT1Afcw1jLrmpvOUCBLNlIPxcactLjPbIKL_C3JLEs-Je57yQ7yh2QiGPzdhKve1wc_zVKuOZ43YbfHOzedGtx33fbhL5yQFQ2kDxNAC7bXe-wHpECR8qC" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=GuoXiCheng/SKIP&type=date&legend=top-left&sealed_token=A2-bonTSUbt1ikMAft77ZB2wFf5oAbd_v8rSpnTATyoZZu3dSXnBgYJvA4ryBg3m5I38hpeT1Afcw1jLrmpvOUCBLNlIPxcactLjPbIKL_C3JLEs-Je57yQ7yh2QiGPzdhKve1wc_zVKuOZ43YbfHOzedGtx33fbhL5yQFQ2kDxNAC7bXe-wHpECR8qC" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=GuoXiCheng/SKIP&type=date&legend=top-left&sealed_token=A2-bonTSUbt1ikMAft77ZB2wFf5oAbd_v8rSpnTATyoZZu3dSXnBgYJvA4ryBg3m5I38hpeT1Afcw1jLrmpvOUCBLNlIPxcactLjPbIKL_C3JLEs-Je57yQ7yh2QiGPzdhKve1wc_zVKuOZ43YbfHOzedGtx33fbhL5yQFQ2kDxNAC7bXe-wHpECR8qC" />
- </picture>
-</a>
+```bash
+sh gradlew :app:testDebugUnitTest :app:assembleDebug
+```
 
-## 自定义规则订阅
+APK 输出在 `app/build/outputs/apk/debug/`。自行构建时会使用构建者自己的调试签名，不能假定与此处发布的 APK 同签名。
 
-<table>
-  <thead>
-    <tr>
-      <th>规则描述</th>
-      <th>订阅链接</th>
-      <th>作者</th>
-      <th>源码地址</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>默认订阅</td>
-      <td><code>https://skip.guoxicheng.top/skip_config_v3.yaml</code></td>
-      <td><a href="https://github.com/GuoXiCheng">GuoXiCheng</a></td>
-      <td>
-        <a href="https://github.com/GuoXiCheng/SKIP/blob/main/app/src/main/assets/skip_config_v3.yaml"
-          >skip_config_v3</a
-        >
-      </td>
-    </tr>
-    <!-- 添加你的订阅 -->
-  </tbody>
-</table>
+现有 34 项单元测试通过。测试涵盖前台时间窗、点击重试、隐藏最近任务状态和自动白名单规则，未覆盖所有手机品牌的实际界面与输入法行为。
 
-> > - 发布你自己的规则订阅源：在本表格中添加一行（订阅链接 / 作者 / 源码地址），然后提交 PR。
-> >
-> > - 为某个 App 补充跳过规则：在 [app/src/main/assets/skip_config_v3.yaml](https://github.com/GuoXiCheng/SKIP/blob/main/app/src/main/assets/skip_config_v3.yaml)
-> >   末尾追加一条规则，然后提交 PR。若同时更新同目录的 skip_config_v3.json（文档用的 JSON 镜像）更佳；
-> >   建议把「布局检查」导出的抓取包一并放入 capture/ 目录，供他人复核。
-> >
-> > > 注意：skipBounds 使用绝对像素坐标，仅对抓取时的设备分辨率有效，添加规则时请在 desc 中注明分辨率。
+## 来源与许可证
+
+- 原项目：[GuoXiCheng/SKIP](https://github.com/GuoXiCheng/SKIP)
+- 本地修改起点：`ad4fa438fddde12d929bb324faf6cec2d86b1182`
+- 保留原项目的 [GPL-3.0 许可证](LICENSE) 和 [免责声明](DISCLAIMER.md)。
+- 变更记录见 [修改说明](SIX_SECOND_WINDOW.md)，保活指引来源见 [参考资料](KEEP_ALIVE_SOURCES.md)。
+
+仓库中的旧文档、规则样例等继承自原项目，可能描述已在本修改版移除的界面；当前使用方式以本页和应用内离线说明为准。

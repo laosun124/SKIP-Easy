@@ -14,7 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,13 +47,9 @@ class SkipLogActivity : AppCompatActivity() {
                 ScaffoldPage(R.string.settings_skip_log_page, { finish() }, {
                     SkipLogContent(skipLogViewModel)
                 }, {
-                    DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
-                        text = { Text(stringResource(id = R.string.record_delete_all)) },
-                        onClick = {
-                            skipLogViewModel.clearAllLogs()
-                        }
-                    )
+                    IconButton(onClick = { skipLogViewModel.clearAllLogs() }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "清空日志")
+                    }
                 })
             }
         }

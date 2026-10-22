@@ -34,10 +34,11 @@ fun AppListColumn(
 
     val lazyPagingItems = pagingDataFlow.collectAsLazyPagingItems()
 
+    val selected by whiteListViewModel.packages.collectAsState()
+    val busy by whiteListViewModel.busy.collectAsState()
     LazyColumn {
         items(lazyPagingItems.itemCount) { index ->
             lazyPagingItems[index]?.let { item ->
-                val checked = remember { mutableStateOf(item.checked) }
                 FlatButton(content = {
                     RowContent(
                         title = item.appName,
@@ -48,9 +49,8 @@ fun AppListColumn(
                                 contentDescription = null,
                                 modifier = Modifier.size(40.dp)
                             )
-                        }, checked.value, {
-                            checked.value = it
-                            whiteListViewModel.updateWhiteList(item.packageName, it)
+                        }, item.packageName in selected, {
+                            if (!busy) whiteListViewModel.updateWhiteList(item.packageName, it)
                         }
                     )
                 })

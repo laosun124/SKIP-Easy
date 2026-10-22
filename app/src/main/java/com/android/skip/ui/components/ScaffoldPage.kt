@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.ui.platform.LocalContext
+import com.android.skip.ui.help.HelpActivity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.skip.R
 
-var expandMenuItems by mutableStateOf(false)
 
 @Composable
 fun ScaffoldPage(
@@ -36,6 +37,15 @@ fun ScaffoldPage(
     content: @Composable (PaddingValues) -> Unit,
     menuItems: (@Composable (ColumnScope.() -> Unit))? = null
 ) {
+    val context = LocalContext.current
+    val helpTopic = when (barTitle) {
+        R.string.whitelist -> "whitelist"
+        R.string.alive -> "alive"
+        R.string.settings -> "settings"
+        R.string.about -> "about"
+        R.string.settings_skip_log_page -> "settings"
+        else -> null
+    }
     Scaffold(topBar = {
         Row(
             modifier = Modifier
@@ -45,7 +55,7 @@ fun ScaffoldPage(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row {
+            Row(Modifier.weight(1f)) {
                 IconButton(
                     onClick = onBackClick,
                     modifier = Modifier.align(Alignment.CenterVertically)
@@ -55,19 +65,17 @@ fun ScaffoldPage(
                 Text(
                     text = stringResource(id = barTitle),
                     fontSize = 24.sp,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.align(Alignment.CenterVertically)
                 )
             }
 
-            menuItems?.let {
-                Row {
-                    IconButton(onClick = { expandMenuItems = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = null)
-                        DropdownMenu(expanded = expandMenuItems,
-                            modifier = Modifier.background(MaterialTheme.colorScheme.background),
-                            onDismissRequest = { expandMenuItems = false }) {
-                            menuItems()
-                        }
+            Row {
+                if (menuItems != null) { Column { menuItems() } }
+                if (helpTopic != null) {
+                    IconButton(onClick = { HelpActivity.open(context, helpTopic) }) {
+                        Icon(painterResource(R.drawable.help), contentDescription = "功能介绍")
                     }
                 }
             }

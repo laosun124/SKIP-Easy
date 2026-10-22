@@ -2,10 +2,8 @@ package com.android.skip.ui.main.start
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.android.skip.service.InspectService
 import com.android.skip.util.AccessibilityState
 import com.android.skip.util.AccessibilityStateUtils
-import com.blankj.utilcode.util.ServiceUtils
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,8 +15,5 @@ class StartAccessibilityRepository @Inject constructor() {
 
     fun changeAccessibilityState(state: AccessibilityState) {
         _accessibilityState.postValue(state)
-        if (state != AccessibilityState.STARTED) {
-            ServiceUtils.stopService(InspectService::class.java)
-        }
     }
 }

@@ -12,7 +12,9 @@ class SearchViewModel @Inject constructor(): ViewModel() {
     val query: LiveData<String> = _query
 
     fun changeQuery(query: String) {
-        _query.postValue(query)
+        // Called on the UI thread; publish the latest text before list observers run.
+        // Selection-only edits must not recreate the app list.
+        if (_query.value != query) _query.value = query
     }
 
     fun getQuery(): String {

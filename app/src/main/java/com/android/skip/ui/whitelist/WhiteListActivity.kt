@@ -8,6 +8,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.livedata.observeAsState
+import com.android.skip.ui.components.CompactWhitelistControls
+import androidx.compose.runtime.LaunchedEffect
+import android.widget.Toast
+import com.android.skip.ui.components.SupportingText
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.android.skip.ui.components.FlatButton
+import com.android.skip.ui.components.RowContent
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -17,10 +27,9 @@ import com.android.skip.MyApp
 import com.android.skip.R
 import com.android.skip.ui.components.ResourceIcon
 import com.android.skip.ui.components.ScaffoldPage
-import com.android.skip.ui.components.expandMenuItems
 import com.android.skip.ui.settings.theme.SwitchThemeViewModel
 import com.android.skip.ui.theme.AppTheme
-import com.android.skip.ui.webview.WebViewActivity
+import com.android.skip.ui.help.HelpActivity
 import com.android.skip.ui.whitelist.list.AppListColumn
 import com.android.skip.ui.whitelist.list.AppListViewModel
 import com.android.skip.ui.whitelist.search.SearchTextField
@@ -46,26 +55,21 @@ class WhiteListActivity : AppCompatActivity() {
         setContent {
             AppTheme(switchThemeViewModel) {
                 ScaffoldPage(R.string.whitelist, { finish() }, {
-                    // 添加搜索栏和应用列表
-                    Column {
+                    val busy by whiteListViewModel.busy.collectAsState()
+                    val result by whiteListViewModel.message.collectAsState()
+                    val showSystem by showSystemViewModel.isShowSystem.observeAsState(false)
+                    LaunchedEffect(result) {
+                        result?.let { Toast.makeText(this@WhiteListActivity, it, Toast.LENGTH_LONG).show() }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CompactWhitelistControls(showSystem, busy,
+                            onShowSystem = { showSystemViewModel.changeIsShowSystem(it) },
+                            onRecognize = { whiteListViewModel.applyAutomatic() })
                         // 搜索栏
                         SearchTextField(searchViewModel)
-                        Spacer(modifier = Modifier.height(8.dp))
                         // 应用列表
                         AppListColumn(appListViewModel, whiteListViewModel)
                     }
-                }, {
-                    DropdownMenuItem(
-                        leadingIcon = { ResourceIcon(iconResource = R.drawable.help) },
-                        text = { Text(stringResource(id = R.string.whitelist_function_intro)) },
-                        onClick = {
-                            val intent = Intent(MyApp.context, WebViewActivity::class.java).apply {
-                                putExtra("url", R.string.whitelist_function_intro_url)
-                            }
-                            startActivity(intent)
-                            expandMenuItems = false
-                        })
-                    ShowSystemButton(showSystemViewModel)
                 })
             }
         }

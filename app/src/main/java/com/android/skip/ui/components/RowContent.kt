@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
 fun RowContent(
@@ -64,7 +65,10 @@ fun RowContent(
                     Text(
                         subTitleValue,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onBackground
+                        lineHeight = 18.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

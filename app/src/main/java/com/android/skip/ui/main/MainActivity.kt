@@ -1,7 +1,5 @@
 package com.android.skip.ui.main
 
-import android.app.ActivityManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -24,13 +22,11 @@ import androidx.compose.ui.unit.sp
 import com.android.skip.MyApp
 import com.android.skip.R
 import com.android.skip.data.config.ConfigViewModel
-import com.android.skip.data.version.ApkVersionViewModel
 import com.android.skip.ui.about.AboutActivity
 import com.android.skip.ui.alive.AliveActivity
 import com.android.skip.ui.components.FlatButton
 import com.android.skip.ui.components.ResourceIcon
 import com.android.skip.ui.components.RowContent
-import com.android.skip.ui.inspect.InspectActivity
 import com.android.skip.ui.main.disclaimer.DisclaimerDialog
 import com.android.skip.ui.main.disclaimer.DisclaimerViewModel
 import com.android.skip.ui.main.start.StartAccessibilityViewModel
@@ -38,10 +34,9 @@ import com.android.skip.ui.main.start.StartButton
 import com.android.skip.ui.main.tutorial.TutorialDialog
 import com.android.skip.ui.main.tutorial.TutorialViewModel
 import com.android.skip.ui.settings.SettingsActivity
-import com.android.skip.ui.settings.recent.RecentViewModel
 import com.android.skip.ui.settings.theme.SwitchThemeViewModel
 import com.android.skip.ui.theme.AppTheme
-import com.android.skip.ui.webview.WebViewActivity
+import com.android.skip.ui.help.HelpActivity
 import com.android.skip.ui.whitelist.WhiteListActivity
 import com.android.skip.util.DataStoreUtils
 import dagger.hilt.android.AndroidEntryPoint
@@ -54,13 +49,11 @@ class MainActivity : AppCompatActivity() {
 
     private val configViewModel by viewModels<ConfigViewModel>()
 
-    private val apkVersionViewModel by viewModels<ApkVersionViewModel>()
 
     private val tutorialViewModel by viewModels<TutorialViewModel>()
 
     private val disclaimerViewModel by viewModels<DisclaimerViewModel>()
 
-    private val recentViewModel by viewModels<RecentViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,9 +84,6 @@ class MainActivity : AppCompatActivity() {
                     WhiteListButton {
                         startActivity(Intent(MyApp.context, WhiteListActivity::class.java))
                     }
-                    InspectButton {
-                        startActivity(Intent(MyApp.context, InspectActivity::class.java))
-                    }
                     SettingsButton {
                         startActivity(Intent(MyApp.context, SettingsActivity::class.java))
                     }
@@ -107,8 +97,8 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }, {
                     tutorialViewModel.changeDialogState(false)
-                    val intent = Intent(MyApp.context, WebViewActivity::class.java).apply {
-                        putExtra("url", R.string.tutorial_url)
+                    val intent = Intent(MyApp.context, HelpActivity::class.java).apply {
+                        putExtra("topic", "start")
                     }
                     startActivity(intent)
                 })
@@ -127,15 +117,7 @@ class MainActivity : AppCompatActivity() {
             configViewModel.loadConfig(it)
         }
 
-        apkVersionViewModel.checkVersion()
 
-        recentViewModel.excludeFromRecent.observe(this) { exclude ->
-            (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).let { manager ->
-                manager.appTasks.forEach { task ->
-                    task?.setExcludeFromRecents(exclude)
-                }
-            }
-        }
     }
 
     override fun onResume() {
@@ -150,17 +132,6 @@ fun AppTitle() {
         fontSize = 24.sp,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onBackground
-    )
-}
-
-@Composable
-fun InspectButton(onClick: () -> Unit = {}) {
-    FlatButton(
-        content = {
-            RowContent(R.string.inspect,
-                null,
-                { ResourceIcon(iconResource = R.drawable.fit_screen) })
-        }, onClick = onClick
     )
 }
 

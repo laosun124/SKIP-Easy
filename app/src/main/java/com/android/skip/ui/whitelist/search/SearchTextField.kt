@@ -13,7 +13,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -26,13 +31,22 @@ import com.android.skip.R
 fun SearchTextField(
     searchViewModel: SearchViewModel
 ) {
-    val queryValue = searchViewModel.query.observeAsState()
+    // Keep the full IME edit state locally and apply every edit synchronously.
+    // Feeding an asynchronously posted String back can rewind the cursor/composing text.
+    var input by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(searchViewModel.getQuery()))
+    }
+    LaunchedEffect(searchViewModel) {
+        searchViewModel.changeQuery(input.text)
+    }
 
     OutlinedTextField(
-        value = queryValue.value ?: "",
+        value = input,
         onValueChange = {
-            searchViewModel.changeQuery(it)
+            input = it
+            searchViewModel.changeQuery(it.text)
         },
+        singleLine = true,
         placeholder = {
             Text(
                 stringResource(id = R.string.search_hint),

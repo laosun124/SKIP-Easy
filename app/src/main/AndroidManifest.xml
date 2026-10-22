@@ -3,14 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
 
     <application
@@ -36,24 +33,13 @@
         <activity
             android:name=".ui.alive.AliveActivity"
             android:exported="false" />
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             tools:node="remove" />
 
-        <activity
-            android:name=".ui.record.InspectRecordActivity"
-            android:exported="false" />
+        <activity android:name=".ui.help.HelpActivity" android:exported="false" />
         <activity
             android:name=".ui.about.AboutActivity"
             android:exported="false" />
@@ -62,23 +48,12 @@
             android:exported="false" />
 
         <service
-            android:name=".service.InspectService"
-            android:enabled="true"
-            android:foregroundServiceType="mediaProjection" />
-        <service
             android:name=".service.MyForegroundService"
             android:foregroundServiceType="specialUse"
             android:enabled="true"
             tools:ignore="ForegroundServicePermission" />
 
-        <service android:name=".service.FloatingWindowService"
-            android:enabled="true"
-            android:exported="false"
-        />
 
-        <activity
-            android:name=".ui.inspect.InspectActivity"
-            android:exported="false" />
 
         <service
             android:name=".service.MyAccessibilityService"

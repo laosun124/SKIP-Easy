@@ -9,6 +9,7 @@ import com.android.skip.dataclass.LoadSkipId
 import com.android.skip.dataclass.LoadSkipText
 import com.blankj.utilcode.util.LogUtils
 import com.blankj.utilcode.util.StringUtils.getString
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 
+data class SkipTarget(
+    val rect: Rect, val matchKey: String, val actionNode: AccessibilityNodeInfo? = null
+)
+
 @Singleton
 class ConfigLoadRepository @Inject constructor() {
     private var configLoadSchemaMap: Map<String, ConfigLoadSchema> = mutableMapOf()
@@ -26,33 +31,29 @@ class ConfigLoadRepository @Inject constructor() {
         configLoadSchemaMap = config
     }
 
-    suspend fun getTargetRect(
-        rootNode: AccessibilityNodeInfo, activityName: String?, isStrict: Boolean?
-    ): Rect? {
+    suspend fun getTarget(
+        rootNode: AccessibilityNodeInfo, activityName: String?
+    ): SkipTarget? {
         val targetAppPackage = rootNode.packageName.toString()
-        var targetConfig = configLoadSchemaMap[targetAppPackage]
-
-        if (isStrict != true) {
-            val defaultSkipTexts = listOf(
-                LoadSkipText(text = getString(R.string.settings_strict_skip))
-            )
-            if (targetConfig == null) {
-                targetConfig = ConfigLoadSchema(targetAppPackage, defaultSkipTexts)
-            } else if (targetConfig.skipTexts == null) {
-                targetConfig.skipTexts = defaultSkipTexts
-            }
-        }
+        val configured = configLoadSchemaMap[targetAppPackage]
+        val defaultSkipTexts = listOf(LoadSkipText(text = getString(R.string.settings_skip_keyword)))
+        // Keep ordinary-mode behavior without modifying the stored configuration.
+        // An explicitly empty text list still disables the text fallback for this app.
+        val targetConfig = configured?.copy(skipTexts = configured.skipTexts ?: defaultSkipTexts)
+            ?: ConfigLoadSchema(targetAppPackage, defaultSkipTexts)
 
         return withContext(Dispatchers.Main) {
             try {
                 val skipByTextTasks =
-                    createSkipByTextTasks(this, rootNode, targetConfig?.skipTexts, activityName)
+                    createSkipByTextTasks(this, rootNode, targetConfig.skipTexts, activityName)
                 val skipByIdTasks =
-                    createSkipByIdTasks(this, rootNode, targetConfig?.skipIds, activityName)
+                    createSkipByIdTasks(this, rootNode, targetConfig.skipIds, activityName)
                 val skipByBoundTasks =
-                    createSkipByBoundTasks(this, rootNode, targetConfig?.skipBounds, activityName)
+                    createSkipByBoundTasks(this, rootNode, targetConfig.skipBounds, activityName)
                 val tasks = skipByTextTasks + skipByIdTasks + skipByBoundTasks
                 awaitFirstNonNullOrComplete(this, tasks)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 LogUtils.e(e)
                 null
@@ -90,37 +91,27 @@ class ConfigLoadRepository @Inject constructor() {
         rootNode: AccessibilityNodeInfo,
         skipTexts: List<LoadSkipText>?,
         activityName: String?
-    ): List<Deferred<Rect?>> {
-        val deferredResults = mutableListOf<Deferred<Rect?>>()
+    ): List<Deferred<SkipTarget?>> {
+        val deferredResults = mutableListOf<Deferred<SkipTarget?>>()
         if (skipTexts.isNullOrEmpty()) return deferredResults
 
         for (skipText in skipTexts) {
             if (skipText.activityName != null && skipText.activityName != activityName) continue
             deferredResults.add(scope.async {
-                val foundNode =
-                    rootNode.findAccessibilityNodeInfosByText(skipText.text).firstOrNull()
-
-                val targetNode = if (foundNode != null) {
-                    if (skipText.length != null) {
-                        if (foundNode.text != null && foundNode.text.length <= skipText.length) {
-                            foundNode
-                        } else {
-                            null
-                        }
-                    } else {
-                        foundNode
+                val targetNode =
+                    rootNode.findAccessibilityNodeInfosByText(skipText.text).firstOrNull { node ->
+                        node.isVisibleToUser && node.isEnabled &&
+                            (skipText.length == null ||
+                                (node.text != null && node.text.length <= skipText.length))
                     }
-                } else {
-                    null
-                }
 
                 if (targetNode != null) {
                     if (skipText.click != null) {
-                        skipText.click
+                        SkipTarget(skipText.click, "text:${skipText.text}")
                     } else {
                         val rect = Rect()
                         targetNode.getBoundsInScreen(rect)
-                        rect
+                        SkipTarget(rect, "text:${skipText.text}", targetNode)
                     }
                 } else {
                     null
@@ -135,22 +126,22 @@ class ConfigLoadRepository @Inject constructor() {
         rootNode: AccessibilityNodeInfo,
         skipIds: List<LoadSkipId>?,
         activityName: String?
-    ): List<Deferred<Rect?>> {
-        val deferredResults = mutableListOf<Deferred<Rect?>>()
+    ): List<Deferred<SkipTarget?>> {
+        val deferredResults = mutableListOf<Deferred<SkipTarget?>>()
         if (skipIds.isNullOrEmpty()) return deferredResults
 
         for (skipId in skipIds) {
             if (skipId.activityName != null && skipId.activityName != activityName) continue
             deferredResults.add(scope.async {
-                val foundNode = rootNode.findAccessibilityNodeInfosByViewId(skipId.id).firstOrNull()
+                val foundNode = rootNode.findAccessibilityNodeInfosByViewId(skipId.id).firstOrNull { it.isVisibleToUser && it.isEnabled }
 
                 if (foundNode != null) {
                     if (skipId.click != null) {
-                        skipId.click
+                        SkipTarget(skipId.click, "id:${skipId.id}")
                     } else {
                         val rect = Rect()
                         foundNode.getBoundsInScreen(rect)
-                        rect
+                        SkipTarget(rect, "id:${skipId.id}", foundNode)
                     }
                 } else {
                     null
@@ -165,8 +156,8 @@ class ConfigLoadRepository @Inject constructor() {
         rootNode: AccessibilityNodeInfo,
         skipBounds: List<LoadSkipBound>?,
         activityName: String?
-    ): List<Deferred<Rect?>> {
-        val deferredResults = mutableListOf<Deferred<Rect?>>()
+    ): List<Deferred<SkipTarget?>> {
+        val deferredResults = mutableListOf<Deferred<SkipTarget?>>()
         if (skipBounds.isNullOrEmpty()) return deferredResults
 
         for (skipBound in skipBounds) {
@@ -175,7 +166,7 @@ class ConfigLoadRepository @Inject constructor() {
             deferredResults.add(scope.async {
                 val foundRect = traverseNode(rootNode, skipBound.bound)
 
-                skipBound.click ?: foundRect
+                foundRect?.let { SkipTarget(skipBound.click ?: it, "bound:${skipBound.bound}") }
             })
         }
         return deferredResults
@@ -190,7 +181,7 @@ class ConfigLoadRepository @Inject constructor() {
             val node = queue.removeAt(0)
             val nodeRect = Rect()
             node.getBoundsInScreen(nodeRect)
-            if (abs(nodeRect.left - targetRect.left) <= 1 && abs(nodeRect.top - targetRect.top) <= 1 && abs(
+            if (node.isVisibleToUser && node.isEnabled && abs(nodeRect.left - targetRect.left) <= 1 && abs(nodeRect.top - targetRect.top) <= 1 && abs(
                     nodeRect.right - targetRect.right
                 ) <= 1 && abs(nodeRect.bottom - targetRect.bottom) <= 1
             ) {
