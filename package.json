@@ -1,7 +1,7 @@
 {
   "name": "skip",
-  "version": "1.0.0",
-  "description": "![GitHub](https://img.shields.io/github/license/GuoXiCheng/SKIP) ![GitHub all releases](https://img.shields.io/github/downloads/GuoXiCheng/SKIP/total) ![GitHub Repo stars](https://img.shields.io/github/stars/GuoXiCheng/SKIP)",
+  "version": "3.1.8",
+  "description": "SKIP 易用版：基于 GuoXiCheng/SKIP，提供开屏广告跳过、白名单及微信小程序专属优化。",
   "main": "index.js",
   "scripts": {
     "docs:dev": "vitepress dev docs",
@@ -12,7 +12,7 @@
     "test": "jest --coverage"
   },
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0",
   "devDependencies": {
     "@codemirror/lang-yaml": "^6.1.2",
     "@codemirror/theme-one-dark": "^6.1.2",

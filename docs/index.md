@@ -2,15 +2,19 @@
 layout: home
 
 hero:
-  name: SKIP
-  text: 基于安卓无障碍服务的自动跳过开屏广告 App
+  name: SKIP 易用版
+  text: 3.1.8 · 开屏广告跳过与微信小程序专属优化
+  tagline: 基于 GuoXiCheng/SKIP 开发，修复使用问题并简化操作。
   image:
     src: /images/logo.png
   actions:
     - theme: brand
-      text: Get Started
-      link: /guide/intro/what-is-skip
+      text: 开始使用
+      link: /guide/intro/getting-started
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/GuoXiCheng/SKIP
+      text: 下载最新版
+      link: https://github.com/laosun124/SKIP-Easy/releases/latest
+    - theme: alt
+      text: 项目源代码
+      link: https://github.com/laosun124/SKIP-Easy
 ---

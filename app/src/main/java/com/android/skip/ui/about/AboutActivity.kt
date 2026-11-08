@@ -27,7 +27,13 @@ class AboutActivity : AppCompatActivity() {
         setContent {
             AppTheme(theme) {
                 ScaffoldPage(R.string.about, { finish() }, {
-                    Text("本应用基于 GuoXiCheng 的开源项目 SKIP 修改，是个人修改版。原项目源代码链接如下。")
+                    Text("SKIP 易用版基于 GuoXiCheng 的开源项目 SKIP 开发，修复使用问题并简化操作。感谢原作者及贡献者。")
+                    FlatButton(content = {
+                        RowContent("项目源代码", "https://github.com/laosun124/SKIP-Easy")
+                    }, onClick = {
+                        startActivity(Intent(this, WebViewActivity::class.java)
+                            .putExtra("address", "https://github.com/laosun124/SKIP-Easy"))
+                    })
                     FlatButton(content = {
                         RowContent("原项目源代码", "https://github.com/GuoXiCheng/SKIP")
                     }, onClick = {

@@ -56,15 +56,17 @@ class WhiteListActivity : AppCompatActivity() {
             AppTheme(switchThemeViewModel) {
                 ScaffoldPage(R.string.whitelist, { finish() }, {
                     val busy by whiteListViewModel.busy.collectAsState()
+                    val wechatOptimization by whiteListViewModel.wechatOptimization.collectAsState()
                     val result by whiteListViewModel.message.collectAsState()
                     val showSystem by showSystemViewModel.isShowSystem.observeAsState(false)
                     LaunchedEffect(result) {
                         result?.let { Toast.makeText(this@WhiteListActivity, it, Toast.LENGTH_LONG).show() }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        CompactWhitelistControls(showSystem, busy,
+                        CompactWhitelistControls(showSystem, busy, wechatOptimization,
                             onShowSystem = { showSystemViewModel.changeIsShowSystem(it) },
-                            onRecognize = { whiteListViewModel.applyAutomatic() })
+                            onRecognize = { whiteListViewModel.applyAutomatic() },
+                            onWechatOptimization = { whiteListViewModel.setWechatOptimization(it) })
                         // 搜索栏
                         SearchTextField(searchViewModel)
                         // 应用列表

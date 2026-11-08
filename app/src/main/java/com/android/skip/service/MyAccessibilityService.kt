@@ -23,6 +23,7 @@ import com.android.skip.MyApp
 import com.android.skip.R
 import com.android.skip.data.config.ConfigLoadRepository
 import com.android.skip.data.config.SkipTarget
+import com.android.skip.data.config.WechatAdRules
 import com.android.skip.ui.alive.notificationbar.NotificationBarRepository
 import com.android.skip.ui.main.start.StartAccessibilityRepository
 import com.android.skip.ui.settings.log.SkipLogRepository
@@ -66,6 +67,8 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     private val attempts = SkipAttemptBudget(SystemClock::elapsedRealtime)
+    private val wechatAdSession = WechatAdSession(SystemClock::elapsedRealtime)
+    private var lastWechatAd: Long? = null
     private var tipShownForVisit = false
     private var gestureSequence = 0L
     private var pendingGesture: Long? = null
@@ -114,9 +117,11 @@ class MyAccessibilityService : AccessibilityService() {
                 tipShownForVisit = false
                 appActivityName = null
                 expiryJob?.cancel()
-                expiryJob = serviceScope.launch {
-                    delay(ForegroundSkipWindow.DURATION_MS)
-                    scanJob?.cancel()
+                if (rootNodePackageName != WechatAdRules.PACKAGE) {
+                    expiryJob = serviceScope.launch {
+                        delay(ForegroundSkipWindow.DURATION_MS)
+                        scanJob?.cancel()
+                    }
                 }
             }
             if (ticket != lastTicket) scanJob?.cancel()
@@ -124,15 +129,34 @@ class MyAccessibilityService : AccessibilityService() {
 
             getActivityName(event)?.let {
                 if (event?.packageName?.toString() == rootNodePackageName) {
-                    if (appActivityName != null && appActivityName != it) attempts.stop()
+                    if (appActivityName != null && appActivityName != it) {
+                        attempts.stop()
+                        if (rootNodePackageName == WechatAdRules.PACKAGE) {
+                            scanJob?.cancel()
+                            if (!WechatAdRules.isMiniProgramActivity(appActivityName) ||
+                                !WechatAdRules.isMiniProgramActivity(it)) {
+                                wechatAdSession.leaveMiniProgram()
+                                lastWechatAd = null
+                            }
+                        }
+                    }
                     appActivityName = it
                 }
             }
 
+            val wechat = rootNodePackageName == WechatAdRules.PACKAGE
+            if (!wechat || !whiteListRepository.wechatOptimization.value || !WechatAdRules.isMiniProgramActivity(appActivityName)) {
+                wechatAdSession.leaveMiniProgram()
+                lastWechatAd = null
+                if (wechat) {
+                    scanJob?.cancel()
+                    return
+                }
+            }
             if (ticket != null && ticket.packageName == rootNodePackageName &&
-                ticket.windowId == rootNode.windowId && skipWindow.canClick(ticket) &&
+                ticket.windowId == rootNode.windowId && (wechat || (skipWindow.canClick(ticket) &&
                 !whiteListRepository.isAppInWhiteList(rootNodePackageName) &&
-                scanTimes < 50 && !attempts.isFinished
+                scanTimes < 50 && !attempts.isFinished))
             ) {
                 if (scanJob?.isActive != true) startScanning(ticket)
             }
@@ -154,32 +178,45 @@ class MyAccessibilityService : AccessibilityService() {
     private fun startScanning(ticket: ForegroundSkipWindow.Ticket) {
         scanJob = serviceScope.launch {
             try {
-                // Poll fresh nodes: an early tap may be ignored until the ad enables its button.
-                while (skipWindow.canClick(ticket) && scanTimes < 50 && !attempts.isFinished) {
-                    if (!canStillClick(ticket)) break
+                val wechat = ticket.packageName == WechatAdRules.PACKAGE
+                while (wechat || (skipWindow.canClick(ticket) && scanTimes < 50 && !attempts.isFinished)) {
+                    if (!canInspectForeground(ticket)) break
+                    if (wechat && (!whiteListRepository.wechatOptimization.value || !WechatAdRules.isMiniProgramActivity(appActivityName))) break
+                    if (!wechat && !canStillClick(ticket)) break
                     if (pendingGesture == null) {
                         val root = rootInActiveWindow ?: break
                         if (root.packageName?.toString() != ticket.packageName || root.windowId != ticket.windowId) break
-                        scanTimes++
-                        val target = configLoadRepository.getTarget(root, appActivityName)
-                        ensureActive()
-                        if (canStillClick(ticket)) {
-                            val bounds = Rect()
-                            root.getBoundsInScreen(bounds)
-                            val visibleTarget = target?.takeIf {
-                                bounds.contains(it.rect.centerX(), it.rect.centerY())
+                        var wechatAdId: Long? = null
+                        val target = if (wechat) {
+                            val match = configLoadRepository.inspectWechatAd(root, appActivityName)
+                            wechatAdId = wechatAdSession.observe(match.adVisible)
+                            if (wechatAdId != null && wechatAdId != lastWechatAd) {
+                                attempts.clear()
+                                tipShownForVisit = false
+                                lastWechatAd = wechatAdId
                             }
-                            // Include the window and matched rule/node, not just the coordinates:
-                            // a replacement control at the old position must not inherit retries.
+                            match.target
+                        } else {
+                            scanTimes++
+                            configLoadRepository.getTarget(root, appActivityName)
+                        }
+                        ensureActive()
+                        if ((!wechat || wechatAdId != null) && canStillClick(ticket, wechatAdId)) {
+                            val bounds = Rect().also { root.getBoundsInScreen(it) }
+                            val visibleTarget = target?.takeIf { bounds.contains(it.rect.centerX(), it.rect.centerY()) }
                             val key = visibleTarget?.let {
                                 "${ticket.packageName}/${ticket.windowId}/${it.matchKey}/" +
                                     "${it.actionNode?.viewIdResourceName}/${it.actionNode?.className}/${it.rect}"
                             }
-                            val attempt = attempts.take(key, skipWindow.canClick(ticket))
-                            if (attempt != null && visibleTarget != null) attemptClick(visibleTarget, ticket, attempt)
+                            // A disabled mini-program skip control can become enabled without starting a new ad.
+                            if (!wechat || visibleTarget != null) {
+                                val attempt = attempts.take(key, withinClickDeadline(ticket, wechatAdId))
+                                if (attempt != null && visibleTarget != null) attemptClick(visibleTarget, ticket, attempt, wechatAdId)
+                            }
                         }
                     }
-                    delay(300)
+                    val activeWechatAd = lastWechatAd?.let { wechatAdSession.canClick(it) } == true
+                    delay(if (wechat && !activeWechatAd) 750 else 300)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -189,18 +226,29 @@ class MyAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun attemptClick(target: SkipTarget, ticket: ForegroundSkipWindow.Ticket, attempt: Int) {
-        val node = clickableNode(target)
+    private fun attemptClick(target: SkipTarget, ticket: ForegroundSkipWindow.Ticket, attempt: Int, wechatAdId: Long? = null) {
+        if (wechatAdId != null) {
+            val root = rootInActiveWindow ?: return
+            val current = configLoadRepository.inspectWechatAd(root, appActivityName).target ?: return
+            if (current.rect != target.rect || current.actionNode?.viewIdResourceName != target.actionNode?.viewIdResourceName) return
+        }
+        if (target.preferGesture) {
+            val freshNode = target.actionNode ?: return
+            if (!freshNode.refresh() || !freshNode.isVisibleToUser || !freshNode.isEnabled) return
+            val freshBounds = Rect().also { freshNode.getBoundsInScreen(it) }
+            if (freshBounds != target.rect) return
+        }
+        val node = if (target.preferGesture) null else clickableNode(target)
         // Prefer the actual button when exposed by accessibility. A still-visible button
         // can fall back to a gesture on a later, freshly matched attempt.
         if (attempt == 1 && node != null && node.refresh() && node.isVisibleToUser &&
-            node.isEnabled && node.isClickable && canStillClick(ticket) &&
+            node.isEnabled && node.isClickable && canStillClick(ticket, wechatAdId) &&
             node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         ) {
-            showAttemptTip(ticket)
+            showAttemptTip(ticket, wechatAdId)
             return
         }
-        if (canStillClick(ticket)) click(this, target.rect, ticket.packageName, target.rect.toString(), ticket)
+        if (canStillClick(ticket, wechatAdId)) click(this, target.rect, ticket.packageName, target.rect.toString(), ticket, wechatAdId)
     }
 
     private fun clickableNode(target: SkipTarget): AccessibilityNodeInfo? {
@@ -220,9 +268,9 @@ class MyAccessibilityService : AccessibilityService() {
         return null
     }
 
-    private fun showAttemptTip(ticket: ForegroundSkipWindow.Ticket) {
+    private fun showAttemptTip(ticket: ForegroundSkipWindow.Ticket, wechatAdId: Long? = null) {
         // Dispatch/performAction success only means the action was accepted, not that the ad closed.
-        if (isShowTip && !tipShownForVisit && skipWindow.canClick(ticket)) {
+        if (isShowTip && !tipShownForVisit && withinClickDeadline(ticket, wechatAdId)) {
             tipShownForVisit = true
             MyToast.show(R.string.toast_skip_tip)
         }
@@ -265,13 +313,24 @@ class MyAccessibilityService : AccessibilityService() {
         return skipWindow.showApp(foregroundPackage, foreground.id)
     }
 
-    private fun canStillClick(ticket: ForegroundSkipWindow.Ticket): Boolean {
-        // Re-read windows: queued results must not land on another app, page or overlay.
+    private fun canInspectForeground(ticket: ForegroundSkipWindow.Ticket): Boolean {
         if (updateForegroundWindow(null) != ticket) return false
-        if (whiteListRepository.isAppInWhiteList(ticket.packageName)) return false
-        val currentRoot = rootInActiveWindow ?: return false
-        return currentRoot.packageName?.toString() == ticket.packageName &&
-            currentRoot.windowId == ticket.windowId && skipWindow.canClick(ticket)
+        val root = rootInActiveWindow ?: return false
+        return root.packageName?.toString() == ticket.packageName && root.windowId == ticket.windowId
+    }
+
+    private fun withinClickDeadline(ticket: ForegroundSkipWindow.Ticket, wechatAdId: Long?): Boolean =
+        if (wechatAdId == null) skipWindow.canClick(ticket) else wechatAdSession.canClick(wechatAdId, whiteListRepository.wechatOptimization.value)
+
+    private fun canStillClick(ticket: ForegroundSkipWindow.Ticket, wechatAdId: Long? = null): Boolean {
+        if (!canInspectForeground(ticket)) return false
+        if (ticket.packageName == WechatAdRules.PACKAGE) {
+            if (wechatAdId == null || !wechatAdSession.canClick(wechatAdId, whiteListRepository.wechatOptimization.value)) return false
+            val root = rootInActiveWindow ?: return false
+            return configLoadRepository.inspectWechatAd(root, appActivityName).adVisible &&
+                wechatAdSession.canClick(wechatAdId, whiteListRepository.wechatOptimization.value)
+        }
+        return !whiteListRepository.isAppInWhiteList(ticket.packageName) && skipWindow.canClick(ticket)
     }
 
     private fun stopAutomaticClicks(leaveApp: Boolean = false) {
@@ -279,6 +338,8 @@ class MyAccessibilityService : AccessibilityService() {
         pendingGesture = null
         if (leaveApp) {
             skipWindow.leaveApp()
+            wechatAdSession.leaveMiniProgram()
+            lastWechatAd = null
             expiryJob?.cancel()
         } else {
             skipWindow.suspendClicks()
@@ -290,7 +351,8 @@ class MyAccessibilityService : AccessibilityService() {
         rect: Rect,
         packageName: String,
         rectStr: String,
-        ticket: ForegroundSkipWindow.Ticket
+        ticket: ForegroundSkipWindow.Ticket,
+        wechatAdId: Long? = null
     ): Boolean {
         val path = Path()
         path.moveTo(rect.centerX().toFloat(), rect.centerY().toFloat())
@@ -300,7 +362,7 @@ class MyAccessibilityService : AccessibilityService() {
             .build()
 
         // Window queries can block; check the deadline again immediately before dispatch.
-        if (!skipWindow.canClick(ticket)) return false
+        if (!canStillClick(ticket, wechatAdId) || !withinClickDeadline(ticket, wechatAdId)) return false
         val gestureId = ++gestureSequence
         pendingGesture = gestureId
         val dispatched = accessibilityService.dispatchGesture(
@@ -310,7 +372,7 @@ class MyAccessibilityService : AccessibilityService() {
                     super.onCompleted(gestureDescription)
                     if (pendingGesture == gestureId) {
                         pendingGesture = null
-                        showAttemptTip(ticket)
+                        showAttemptTip(ticket, wechatAdId)
                     }
                 }
 

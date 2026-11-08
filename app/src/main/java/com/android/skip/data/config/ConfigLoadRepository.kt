@@ -20,8 +20,11 @@ import javax.inject.Singleton
 import kotlin.math.abs
 
 data class SkipTarget(
-    val rect: Rect, val matchKey: String, val actionNode: AccessibilityNodeInfo? = null
+    val rect: Rect, val matchKey: String, val actionNode: AccessibilityNodeInfo? = null,
+    val preferGesture: Boolean = false
 )
+
+data class WechatAdMatch(val adVisible: Boolean, val target: SkipTarget? = null)
 
 @Singleton
 class ConfigLoadRepository @Inject constructor() {
@@ -35,6 +38,10 @@ class ConfigLoadRepository @Inject constructor() {
         rootNode: AccessibilityNodeInfo, activityName: String?
     ): SkipTarget? {
         val targetAppPackage = rootNode.packageName.toString()
+        if (targetAppPackage == WechatAdRules.PACKAGE) return null
+        if (PersonalSplashRules.supports(targetAppPackage)) {
+            return findPersonalSplashTarget(rootNode, targetAppPackage)
+        }
         val configured = configLoadSchemaMap[targetAppPackage]
         val defaultSkipTexts = listOf(LoadSkipText(text = getString(R.string.settings_skip_keyword)))
         // Keep ordinary-mode behavior without modifying the stored configuration.
@@ -59,6 +66,63 @@ class ConfigLoadRepository @Inject constructor() {
                 null
             }
         }
+    }
+
+    fun inspectWechatAd(root: AccessibilityNodeInfo, activityName: String?): WechatAdMatch {
+        if (root.packageName?.toString() != WechatAdRules.PACKAGE ||
+            !WechatAdRules.isMiniProgramActivity(activityName)) return WechatAdMatch(false)
+        fun Rect.box() = PersonalSplashRules.Box(left, top, right, bottom)
+        val frame = Rect().also { root.getBoundsInScreen(it) }
+        val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+        queue.add(root to -1)
+        val nodes = mutableListOf<AccessibilityNodeInfo>()
+        val snapshots = mutableListOf<WechatAdRules.Node>()
+        while (queue.isNotEmpty()) {
+            val (node, parent) = queue.removeFirst()
+            if (!node.isVisibleToUser) continue
+            val bounds = Rect().also { node.getBoundsInScreen(it) }
+            val index = nodes.size
+            nodes.add(node)
+            snapshots.add(WechatAdRules.Node(bounds.box(), node.text?.toString(),
+                node.contentDescription?.toString(), parent, enabled = node.isEnabled))
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it to index) }
+            }
+        }
+        val index = WechatAdRules.select(activityName, frame.box(), snapshots) ?: return WechatAdMatch(false)
+        if (!snapshots[index].enabled) return WechatAdMatch(true)
+        val bounds = Rect().also { nodes[index].getBoundsInScreen(it) }
+        return WechatAdMatch(true, SkipTarget(bounds, "wechat-mini-ad", nodes[index], preferGesture = true))
+    }
+
+    private fun findPersonalSplashTarget(root: AccessibilityNodeInfo, packageName: String): SkipTarget? {
+        fun Rect.box() = PersonalSplashRules.Box(left, top, right, bottom)
+        val frame = Rect().also { root.getBoundsInScreen(it) }
+        data class Entry(val node: AccessibilityNodeInfo, val inSplash: Boolean = false, val inAd: Boolean = false)
+        val queue = ArrayDeque<Entry>()
+        queue.add(Entry(root))
+        val nodes = mutableListOf<AccessibilityNodeInfo>()
+        val snapshots = mutableListOf<PersonalSplashRules.Node>()
+        while (queue.isNotEmpty()) {
+            val entry = queue.removeFirst()
+            val node = entry.node
+            if (!node.isVisibleToUser || !node.isEnabled) continue
+            val bounds = Rect().also { node.getBoundsInScreen(it) }
+            val id = node.viewIdResourceName
+            val inSplash = entry.inSplash || id == "com.coolapk.market:id/main_splash_ad"
+            val inAd = entry.inAd || (inSplash && id == "com.coolapk.market:id/ad_container" &&
+                bounds.width() >= frame.width() * .8 && bounds.height() >= frame.height() * .55)
+            nodes.add(node)
+            snapshots.add(PersonalSplashRules.Node(bounds.box(), node.text?.toString(),
+                node.contentDescription?.toString(), id, node.className?.toString(),
+                node.isClickable, node.childCount == 0, inAd))
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(Entry(it, inSplash, inAd)) }
+            }
+        }
+        val index = PersonalSplashRules.select(packageName, frame.box(), snapshots) ?: return null
+        val bounds = Rect().also { nodes[index].getBoundsInScreen(it) }
+        return SkipTarget(bounds, "personal-splash", nodes[index], preferGesture = true)
     }
 
     private suspend fun <T> awaitFirstNonNullOrComplete(

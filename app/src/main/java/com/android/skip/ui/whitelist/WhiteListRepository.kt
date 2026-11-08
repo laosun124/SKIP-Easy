@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import com.android.skip.MyApp
 import com.android.skip.R
 import com.android.skip.util.dataStore
+import com.android.skip.util.DataStoreUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -26,6 +27,21 @@ class WhiteListRepository @Inject constructor() {
         })
     }
     val packages: StateFlow<Set<String>> get() = state
+
+    private val wechatKey = "WECHAT_MINI_OPTIMIZATION"
+    private val _wechatOptimization = MutableStateFlow(DataStoreUtils.getSyncData(wechatKey, true))
+    val wechatOptimization: StateFlow<Boolean> = _wechatOptimization
+
+    suspend fun setWechatOptimization(enabled: Boolean) = mutex.withLock {
+        val previous = _wechatOptimization.value
+        _wechatOptimization.value = enabled
+        try {
+            MyApp.context.dataStore.edit { it[booleanPreferencesKey(wechatKey)] = enabled }
+        } catch (error: Exception) {
+            _wechatOptimization.value = previous
+            throw error
+        }
+    }
 
     suspend fun updateWhiteList(packageName: String, checked: Boolean) = mutex.withLock {
         val before = state.value

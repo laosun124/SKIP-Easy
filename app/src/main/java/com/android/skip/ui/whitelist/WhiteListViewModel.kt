@@ -17,6 +17,7 @@ class WhiteListViewModel @Inject constructor(
     private val repository: WhiteListRepository
 ) : ViewModel() {
     val packages = repository.packages
+    val wechatOptimization = repository.wechatOptimization
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
     private val _message = MutableStateFlow<String?>(null)
@@ -29,6 +30,15 @@ class WhiteListViewModel @Inject constructor(
                 repository.updateWhiteList(packageName, checked)
             } catch (e: CancellationException) { throw e
             } catch (_: Exception) { _message.value = "保存失败，请重试" }
+        }
+    }
+
+    fun setWechatOptimization(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                repository.setWechatOptimization(enabled)
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { _message.value = "微信优化设置保存失败，请重试" }
         }
     }
 
